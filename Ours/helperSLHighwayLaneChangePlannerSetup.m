@@ -15,9 +15,9 @@ function helperSLHighwayLaneChangePlannerSetup(nvp)
 %% Inputs
 arguments
     nvp.scenarioFcnName {mustBeMember(nvp.scenarioFcnName,...
-        ["scenario_01_DecisionTrigger";...
-         "scenario_02_ClutteredEnv";...
-         "scenario_03_SafetyTrigger";])} = "scenario_03_SafetyTrigger";
+        ["scenario_01_MergingCar";...
+         "scenario_02_DecisionTrigger"; ...
+         ])} = "scenario_02_DecisionTrigger";
 end
 
 % Load the test bench model
@@ -122,6 +122,7 @@ MaxFront = 20;
 MaxRear = 20;
 
 Useresample = true;
+feasible_coeff = 0.7;
 
 assignin('base', 'timeHorizon' , timeHorizon);
 assignin('base','timeResolution',timeResolution);
@@ -142,7 +143,8 @@ assignin('base', 'MaxFront', MaxFront);
 assignin('base', 'MaxRear', MaxRear);
 
 assignin('base', 'Useresample', Useresample);
- 
+assignin('base', 'Feasible_coeff', feasible_coeff);
+
 % Check for set speed and initinal velocity
 if floor(egoSetVelocity) ~= 0 || floor(hypot(EgoActor(1).Velocity(1), EgoActor(1).Velocity(2))) ~= 0
     assignin('base','setSpeed',egoSetVelocity);

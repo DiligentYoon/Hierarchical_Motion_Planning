@@ -2,11 +2,13 @@ function Optimal_Planner = helperFindoptimalsequence(InitStruct_Planner, ...
                                                      node_costs, ...
                                                      LK_set, ...
                                                      LC_set, ...
+                                                     EgoState, ...
                                                      Planner_params)
     % 제약
     %  - 연속 Spatio 금지
     %  - Spatio 1회만 허용
     %  - Spatio일 때만 동역학 타당성 검사(dynamical_feasible)
+    %  + (추가) Forward/Backward speed feasibility + s-interval reachability 검사
 
     Optimal_Planner  = InitStruct_Planner;
     num_total_nodes  = Optimal_Planner.num_total_nodes;
@@ -15,27 +17,51 @@ function Optimal_Planner = helperFindoptimalsequence(InitStruct_Planner, ...
     start_node       = Optimal_Planner.start_node;
     end_nodes_all    = Optimal_Planner.end_nodes(:).';   % row vector
     end_nodes        = end_nodes_all(end_nodes_all ~= 0);
-    N                = num_total_nodes;
-    maxDeg = 10;
-    FALSE = 1;  
-    TRUE  = 2;
 
-    % --- 전처리: 이웃 목록 / Spatio 인접표 ---
-    [neighbors_mat, neighbors_len] = precomputeNeighbors(W, maxDeg); 
+    N      = num_total_nodes;
+    maxDeg = 10;
+    FALSE  = 1;
+    TRUE   = 2;
+
+    % Longitudinal bounds
+    a_lon_max = Planner_params.MaxLonAccel;
+    a_lon_min = -Planner_params.MaxLonAccel;
+
+    v_lon_max = Planner_params.MaxLonVelocity;
+    v_lon_min = Planner_params.MinLonVelocity;
+
+    ego_s0 = EgoState(1);
+    ego_v0 = max(v_lon_min, min(v_lon_max, EgoState(2)));
+
+    % --- 전처리(1): 이웃 목록 / Spatio 인접표 ---
+    [neighbors_mat, neighbors_len] = precomputeNeighbors(W, maxDeg);
     S = buildSpatioAdjacency(LC_set, N);      % logical(N,N), S(u,v)=true면 spatio
 
+    % --- 전처리(2): Backward-feasible Band 계산 ---
+    %   B_lo, B_hi, hasB : (N x 2 x 2)
+    %   hasB(n,e,l)=true이면 (n,e,l)에서 terminal까지 이어질 수 있는 속도 band 존재
+    [B_lo, B_hi, hasB] = helperComputeBackwardFeasibleBand( ...
+        Gaps, neighbors_mat, neighbors_len, S, start_node, end_nodes, ...
+        a_lon_min, a_lon_max, v_lon_min, v_lon_max, Planner_params);
+
+
     % --- 자료구조 사전할당 (노드×상태 2×2) ---
-    % dist(v,e,l), prev_v/prev_e/prev_l(v,e,l)
     dist   =   inf(N, 2, 2); % Node에 (e, l)상태로 도달했을 때 최소 비용
     prev_v = zeros(N, 2, 2); % node
-    prev_e = zeros(N, 2, 2); % everspatio (한 번이라도 차선 변경이 있었는지 ?)
-    prev_l = zeros(N, 2, 2); % lastspatio (직전 노드가 차선 변경을 수행했는지 ?)
+    prev_e = zeros(N, 2, 2); % everspatio
+    prev_l = zeros(N, 2, 2); % lastspatio
     inQ    = false(N, 2, 2); % (v, e, l) 상태가 Q 집합 내부에 있는지 ?
+
+    % Forward-feasible speed band (라벨별)
+    F_lo =  inf(N, 2, 2);
+    F_hi = -inf(N, 2, 2);
 
     % 시작 상태: (start_node, e=0, l=0)
     dist(start_node, FALSE, FALSE) = 0;
-    % dist(start_node, FALSE, FALSE) = node_costs(start_node);
     inQ(start_node,  FALSE, FALSE) = true;
+
+    F_lo(start_node, FALSE, FALSE) = ego_v0;
+    F_hi(start_node, FALSE, FALSE) = ego_v0;
 
     % --- 제약 포함 다익스트라 메인 루프 ---
     while any(inQ(:))
@@ -54,15 +80,28 @@ function Optimal_Planner = helperFindoptimalsequence(InitStruct_Planner, ...
         lastIsSp_u = (lu == TRUE); % 현재 u 노드는 직전 노드가 차선 변경 노드인가 ?
         everSp_u   = (eu == TRUE); % 현재 u 노드는 한 번이라도 차선 변경이 있었는가 ?
 
+        % 현재 라벨(u,eu,lu)의 속도 band
+        vlo_u = F_lo(u, eu, lu);
+        vhi_u = F_hi(u, eu, lu);
+        if ~isfinite(vlo_u) || ~isfinite(vhi_u) || (vlo_u > vhi_u)
+            continue;
+        end
+
         % 모든 이웃 v 확장
         for k = 1:len_u
             v = neighbors_mat(u, k);
+            if v == 0
+                continue;
+            end
+
             edgeIsSp = S(u, v); % 이번 연결이 차선 변경 관계인가 ?
+
             % (A) 연속 Spatio 금지
             if lastIsSp_u && edgeIsSp
                 continue;
             end
-            % (B) Spatio 1회 제한 + 동역학 타당성(Spatio일 때만)
+
+            % (B) Spatio 1회 제한 + 횡방향 동역학 타당성(Spatio일 때만)
             if edgeIsSp
                 if everSp_u
                     continue;
@@ -71,23 +110,55 @@ function Optimal_Planner = helperFindoptimalsequence(InitStruct_Planner, ...
                     continue;
                 end
             end
-            % (C) 다음 상태 계산
+
+            % (C) 다음 상태 계산 (v에서의 상태 인덱스)
             lv = FALSE; if edgeIsSp, lv = TRUE; end
             ev = FALSE; if (everSp_u || edgeIsSp), ev = TRUE; end
+
+            % Forward/Backward feasibility 검사 (핵심)
+            [ok, vlo_next, vhi_next] = helperForwardBackwardCheck( ...
+                Gaps, start_node, u, v, vlo_u, vhi_u, ...
+                a_lon_min, a_lon_max, v_lon_min, v_lon_max, Planner_params, ...
+                B_lo, B_hi, hasB, ev, lv);
+
+            if ~ok
+                continue;
+            end
+
             % (D) 비용 갱신 (동일 time index에서 비용 중복 누적 방지)
             if (Gaps(u).time_idx == Gaps(v).time_idx)
-                % 동일 time index에서는 차선 변경에 대한 spatio cost만 누적
-                node_cost = 0;
+                node_cost = 0; % 동일 time index에서는 spatio 결과만 유지
             else
                 node_cost = node_costs(v);
             end
+
             alt = bestval + W(u, v) + node_cost;
+
+            % (E) dist 갱신 + 속도 band 저장(추가)
             if alt < dist(v, ev, lv)
                 dist(v, ev, lv)   = alt;
                 prev_v(v, ev, lv) = u;
                 prev_e(v, ev, lv) = eu;
                 prev_l(v, ev, lv) = lu;
                 inQ(v, ev, lv)    = true;
+
+                F_lo(v, ev, lv)   = vlo_next;
+                F_hi(v, ev, lv)   = vhi_next;
+
+            elseif alt == dist(v, ev, lv)
+                % 비용이 같은 경우, feasibility band가 더 "좋은" 경로를 유지
+                % - 더 넓은 band를 선호(이후 확장 가능성 증가)
+                old_lo = F_lo(v, ev, lv);
+                old_hi = F_hi(v, ev, lv);
+                if (~isfinite(old_lo) || ~isfinite(old_hi) || (vlo_next < old_lo) || (vhi_next > old_hi))
+                    prev_v(v, ev, lv) = u;
+                    prev_e(v, ev, lv) = eu;
+                    prev_l(v, ev, lv) = lu;
+                    inQ(v, ev, lv)    = true;
+
+                    F_lo(v, ev, lv)   = min(old_lo, vlo_next);
+                    F_hi(v, ev, lv)   = max(old_hi, vhi_next);
+                end
             end
         end
     end
@@ -175,7 +246,6 @@ function [neighbors_mat, neighbors_len] = precomputeNeighbors(W, maxDeg)
     neighbors_len = zeros(N, 1);
     for u = 1:N
         cnt = 0;
-        % 유효 이웃을 스캔
         for v = 1:N
             if u == v
                 continue;
@@ -195,7 +265,6 @@ function S = buildSpatioAdjacency(LC_set, N)
     % Spatio 인접표: S(u,v)=true면 spatio edge
     S = false(N, N);
     for i = 1:length(LC_set)
-        % 동일 시점의 Spatio Graph를 바탕으로 Marking
         sp = LC_set(i).spatio_topology_global_graph;
         num_nodes = LC_set(i).num_nodes;
         if ~isempty(sp)
@@ -251,8 +320,8 @@ function is_valid = dynamical_feasible(gap_list, start_node, new_node, planner_p
     start_gap = gap_list(start_node);
     new_gap   = gap_list(new_node);
 
-    planning_resolution = planner_params.PlanningResolution; % (= prediction_dt)
-    ad_max = planner_params.MaxLatAccel;                      % (= boundary.ad_max)
+    planning_resolution = planner_params.PlanningResolution;
+    ad_max = planner_params.MaxLatAccel;
 
     dt = planning_resolution * max(1, (new_gap.time_idx - start_gap.time_idx));
     delta_d = abs(new_gap.d - start_gap.d)/2;

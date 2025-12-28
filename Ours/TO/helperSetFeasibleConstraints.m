@@ -52,21 +52,21 @@ function [A_feasible, b_feasible] = helperSetFeasibleConstraints(e1, e2, bounds,
             row_idx = row_idx + (m-1);            
         end
     else
-        v_s_max = bounds.vs_max; v_s_min = bounds.vs_min;
-        v_d_max = bounds.vd_max; v_d_min = bounds.vd_min;
-        a_s_max = bounds.as_max; a_s_min = bounds.as_min;
-        a_d_max = bounds.ad_max; a_d_min = bounds.ad_min;
-        v_s_terminal_min = bounds.vs_terminal_min;
-        v_s_terminal_max = bounds.vs_terminal_max;
+        v_s_max = bounds.vs_max + 1e-6; v_s_min = bounds.vs_min - 1e-6;
+        v_d_max = bounds.vd_max + 1e-6; v_d_min = bounds.vd_min - 1e-6;
+        a_s_max = bounds.as_max + 1e-6; a_s_min = bounds.as_min - 1e-6;
+        a_d_max = bounds.ad_max + 1e-6; a_d_min = bounds.ad_min - 1e-6;
+        v_s_terminal_min = bounds.vs_terminal_min - 1e-6;
+        v_s_terminal_max = bounds.vs_terminal_max + 1e-6;
         for i = 1:N
             % s방향 속도 제약조건 : 최대
             % s방향 속도 제약조건 : 최소
             if i == N
                 % 마지막 구간에서는 Terminal State 값 이용
-                b_feasible(row_idx+(1:m-1)) = v_s_max;
-                b_feasible(row_idx+(m)) = v_s_terminal_max;
+                % b_feasible(row_idx+(1:m-1)) = v_s_max;
+                b_feasible(row_idx+(1:m)) = v_s_terminal_max;
                 row_idx = row_idx + m;
-                b_feasible(row_idx+(1:m-1)) = -v_s_min;
+                % b_feasible(row_idx+(1:m-1)) = -v_s_min;
                 b_feasible(row_idx+(1:m)) = -v_s_terminal_min;
                 row_idx = row_idx + m;
             else

@@ -12,7 +12,7 @@ function [scenario, egoVehicle, roadCenters] = scenario_LC_20_SafetyTrigger()
 %   Copyright 2019-2021 The MathWorks, Inc.
 
 % Construct a drivingScenario object.
-scenario = drivingScenario('StopTime', 50, ...
+scenario = drivingScenario('StopTime', 40, ...
     'SampleTime', 0.1);
 
 % Add all road segments

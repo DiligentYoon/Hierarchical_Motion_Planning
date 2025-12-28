@@ -23,7 +23,7 @@ params = struct("MaxLonVel", maxLonVelocity, ...
 time = tout;
 ego_frenet = squeeze(EgoFrenet.signals.values);
 ego_info = squeeze(EgoInfo.signals.values);
-ttc = max(0, min(params.MaxTTC, TTC.signals.values));
+inverse_ttc = inverse_TTC.signals.values;
 trigger = Trigger.signals.values;
 trajectory = Trajectory.signals.values;
 safety_distance = Safety_Distance.signals.values;
@@ -104,32 +104,32 @@ figure;
 set(gcf, 'color', 'w')
 
 hold on;
-plot(time, ttc, 'LineWidth', 1.5);
-plot(time, trigger,  'r--', 'LineWidth', 0.5);
-yline(params.MinTTC, 'r--', 'MinTTC', 'LabelHorizontalAlignment', 'left');
-yline(params.MaxTTC, 'g--', 'MaxTTC', 'LabelHorizontalAlignment', 'left');
-ylim([-1, params.MaxTTC + 1])
+plot(time, inverse_ttc, 'LineWidth', 1.5);
+% plot(time, trigger,  'r--', 'LineWidth', 0.5);
+yline(1/params.MinTTC, 'r--', 'MinTTC', 'LabelHorizontalAlignment', 'left');
+% yline(1/params.MaxTTC, 'g--', 'MaxTTC', 'LabelHorizontalAlignment', 'left');
+ylim([0, 1/params.MinTTC + 0.5])
 xlabel('Time (s)');
-ylabel('Time-to-Collision (s)');
-title('Time-to-Collision (TTC)');
+ylabel('Inverse Time-to-Collision (s)');
+title('Inverse Time-to-Collision (TTC)');
 grid on;
 
 
 %% 1. Safety Analysis
 
-ttc_vio_id = (0 < ttc) & (ttc < params.MinTTC);
-ttc_vio_value = ttc(ttc_vio_id);
+ttc_vio_id = (inverse_ttc >= 1/params.MinTTC);
+ttc_vio_value = inverse_ttc(ttc_vio_id);
 
 if isempty(ttc_vio_value)
-    mean_ttc = 0;
-    num_ttc = length(ttc_vio_value);
+    mean_ittc = 0;
+    num_ittc = length(ttc_vio_value);
 else
-    mean_ttc = mean(ttc_vio_value);
-    num_ttc = length(ttc_vio_value);
+    mean_ittc = mean(ttc_vio_value);
+    num_ittc = length(ttc_vio_value);
 end
 fprintf("TTC violation analysis: \n")
-fprintf("mean of vio TTC  : %.2f \n", mean_ttc);
-fprintf("Num vio : %d \n", num_ttc);
+fprintf("mean of vio TTC  : %.2f \n", mean_ittc);
+fprintf("Num vio : %d \n", num_ittc);
 
 %% 2. Efficiency Analysis
 
@@ -141,12 +141,12 @@ fprintf("total lateral distance : %.2f\n", travel_lat_dist);
 
 
 %% Excel
-excelFile = 'Results/result_wo_case3.xlsx';
+excelFile = 'Results/result_wo_case2.xlsx';
 
 % Summary metrics 
 
-summaryTbl = table(mean_ttc, num_ttc, travel_lon_dist, travel_lat_dist, ...
-    'VariableNames', {'MeanTTC', 'NumTTC', 'TravelLonDist', 'TravelLatDist'});
+summaryTbl = table(mean_ittc, num_ittc, travel_lon_dist, travel_lat_dist, ...
+    'VariableNames', {'MeanITTC', 'NumITTC', 'TravelLonDist', 'TravelLatDist'});
 
 writetable(summaryTbl, excelFile, 'Sheet', 'Summary', 'WriteMode', 'overwritesheet');
 
@@ -156,7 +156,7 @@ timeSeriesTbl = table( ...
     approx_lat_vel(:), ...         % Lateral velocity
     approx_lon_accel(:), ...       % Longitudinal acceleration
     approx_lat_accel(:), ...       % Lateral acceleration
-    ttc(:), ...                    % TTC
+    inverse_ttc(:), ...            % Inverse TTC
     safety_distance(:), ...        % Safety Distance
     trigger(:), ...                % Trigger
     'VariableNames', { ...
@@ -165,7 +165,7 @@ timeSeriesTbl = table( ...
         'LatVel', ...
         'LonAccel', ...
         'LatAccel', ...
-        'TTC', ...
+        'ITTC', ...
         'SafetyDistance', ...
         'Trigger'});
 

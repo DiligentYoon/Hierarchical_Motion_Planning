@@ -107,6 +107,9 @@
         %EnableBirdsEyeView
         EnableBirdsEyeView (1, 1) logical = true;
 
+        % gif
+        useGIF (1, 1) logical = false;
+
     end
 
     % Constants used in the System object.
@@ -594,18 +597,21 @@
                     set(obj.Figure,'CloseRequestFcn',...
                         "warndlg({'Unable to close the Lane Change Status Plot during simulation. To disable Lane Change Status Plot, deselect ''Enable Chase view and Enable Top view checkboxes'''},'Warning');");
                 end
-                % Capture the frame for the GIF
-                frame = getframe(obj.Figure);
-                img = frame2im(frame);
-                [imgInd, cm] = rgb2ind(img, 256);
+                
+                if obj.useGIF
+                    % Capture the frame for the GIF
+                    frame = getframe(obj.Figure);
+                    img = frame2im(frame);
+                    [imgInd, cm] = rgb2ind(img, 256);
 
-                % Write the frame to the GIF file
-                if obj.FrameCount == 0
-                    imwrite(imgInd, cm, obj.GifFilename, 'gif', 'Loopcount', inf, 'DelayTime', 1/10);
-                else
-                    imwrite(imgInd, cm, obj.GifFilename, 'gif', 'WriteMode', 'append', 'DelayTime', 1/10);
+                    % Write the frame to the GIF file
+                    if obj.FrameCount == 0
+                        imwrite(imgInd, cm, obj.GifFilename, 'gif', 'Loopcount', inf, 'DelayTime', 1/10);
+                    else
+                        imwrite(imgInd, cm, obj.GifFilename, 'gif', 'WriteMode', 'append', 'DelayTime', 1/10);
+                    end
+                    obj.FrameCount = obj.FrameCount + 1;
                 end
-                obj.FrameCount = obj.FrameCount + 1;
 
             end
         end

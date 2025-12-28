@@ -41,6 +41,14 @@ N_R = 5*2; % region 범위 5개 x 2 = 10개
 planning_horizon = planner_params.TimeHorizon;
 planning_resolution = planner_params.PlanningResolution;
 v_max = planner_params.MaxLonVelocity;
+v_min = planner_params.MinLonVelocity;
+a_max = planner_params.MaxLonAccel;
+a_min = -planner_params.MaxLonAccel;
+ttc_max = planner_params.MaxTTC;
+maxFront = planner_params.MaxFront;
+maxRear = planner_params.MaxRear;
+feasible_coeff = planner_params.Feasible_coeff;
+
 LaneWidth = MapInfo.LaneWidth(1);
 LaneCenters = MapInfo.LaneCenters;
 
@@ -191,6 +199,87 @@ for i = 1:N_t
     end
 end
 
+%% Lane 별 Terminal Velocity Range 생성
+terminal_velocity_range = zeros(3, 2);
+for i = 1:NumLanes
+    r = ValidLanes(i);
+    % ego-centric row로 변환: 1=Right, 2=Ego, 3=Left
+    row = 2 - sign(r);
+
+    % 차선별 계산값 리셋
+    Target_vel_low  = 0;
+    Target_vel_high = 0;
+
+    front_mio_state = front_MIO_States(i, :);
+    rear_mio_state  = rear_MIO_States(i, :);
+
+    is_front = ~all(front_mio_state == 0);
+    is_rear  = ~all(rear_mio_state  == 0);
+
+    if is_front && is_rear
+        if abs(front_mio_state(1) - EgoState(1)) < abs(rear_mio_state(1) - EgoState(1))
+            target_mio_state = front_mio_state;
+        else
+            target_mio_state = rear_mio_state;
+        end
+    elseif is_front
+        target_mio_state = front_mio_state;
+    elseif is_rear
+        target_mio_state = rear_mio_state;
+    else
+        target_mio_state = zeros(1,6);
+    end
+
+    MIO_pos_s = target_mio_state(1);
+    MIO_vel   = target_mio_state(2);
+
+    if MIO_pos_s == 0 && MIO_vel == 0
+        % 0. MIO 없는 경우
+        Target_vel_low = min(EgoState(2)+a_max*planning_horizon*feasible_coeff, v_max*feasible_coeff);
+        Target_vel_high = v_max;
+    else
+        % 1. 앞 MIO가 빠른 경우
+        if (MIO_pos_s - EgoState(1) > 0 && MIO_vel > EgoState(2))
+            Target_vel_low  = min(EgoState(2)+a_max*planning_horizon*feasible_coeff, MIO_vel);
+            Target_vel_low  = min(Target_vel_low, v_max*feasible_coeff);
+            Target_vel_high = v_max;
+        end
+
+        % 2. 뒤 MIO가 느린 경우
+        if (MIO_pos_s - EgoState(1) < 0 && MIO_vel < EgoState(2))
+            Target_vel_low  = min(EgoState(2)+a_max*planning_horizon*feasible_coeff, v_max*feasible_coeff);
+            Target_vel_high = v_max;
+        end
+
+        % 3. 앞 MIO가 느리지만, 최대 TTC 바깥인 경우
+        if (MIO_pos_s - EgoState(1) > 0 && MIO_vel < EgoState(2))
+            ttc = (MIO_pos_s - EgoState(1) - maxFront) / (EgoState(2) - MIO_vel);
+            if ttc >= ttc_max
+                Target_vel_low  = EgoState(2);
+                Target_vel_high = v_max;
+            end
+        end
+
+        % 4. 뒤 MIO가 빠르지만, 최대 TTC 바깥인 경우
+        if (MIO_pos_s - EgoState(1) < 0 && MIO_vel > EgoState(2))
+            ttc = (EgoState(1) - MIO_pos_s - maxRear) / (MIO_vel - EgoState(2));
+            if ttc >= ttc_max
+                Target_vel_low  = min(EgoState(2)+a_max*planning_horizon*feasible_coeff, MIO_vel);
+                Target_vel_low  = min(Target_vel_low, v_max*feasible_coeff);
+                Target_vel_high = v_max;
+            end
+        end
+
+        % fallback (target band가 아직 안 정해진 경우)
+        if Target_vel_low == 0 || Target_vel_high == 0
+            [Target_vel_low, Target_vel_high] = helperCalculateTargetstates( ...
+                EgoState, MIO_pos_s, MIO_vel, planner_params, feasible_coeff);
+        end
+    end
+    terminal_velocity_range(row, :) = [Target_vel_low, Target_vel_high];
+end
+
+
 %% Gap G(t) & Free set F(t) 정의
 gap_ids = 1;
 for i = 1:N_t-1
@@ -225,7 +314,7 @@ for i = 1:N_t-1
             gap.IsValid = true;
             
             % 3) Node Cost Calculation
-            % 1. 각 gap을 기준으로 front & rear 어디에 위치하는지 식별
+            % 각 gap을 기준으로 front & rear 어디에 위치하는지 식별
             [is_gap_front, is_gap_rear, ...
              gap_front_mio_state, gap_rear_mio_state] = select_target_mio_gap(gap, ...
                                                                               is_front, ...
@@ -234,24 +323,34 @@ for i = 1:N_t-1
                                                                               rear_mio_state, ...
                                                                               EgoState);
                 
-            % 2. 선별된 front & rear mio를 바탕으로 distance weight 계산
+            % 선별된 front & rear mio를 바탕으로 distance weight 계산
+            front_mio_s = gap_front_mio_state(1);
+            rear_mio_s = gap_rear_mio_state(1);
             distance_weight_f = double(is_gap_front) * ...
-                                (1 - abs(gap_front_mio_state(1)-EgoState(1)) / 150); 
+                                (1 - abs(front_mio_s-EgoState(1)) / 150); 
             distance_weight_r = double(is_gap_rear) * ...
-                                (1 - abs(gap_rear_mio_state(1)-EgoState(1)) / 150);
+                                (1 - abs(rear_mio_s-EgoState(1)) / 150);
 
-            % 3. distance weighted transportation cost 계산
+            % distance weighted transportation cost 계산
             front_mio_v = gap_front_mio_state(2);
             rear_mio_v = gap_rear_mio_state(2);
             transport_cost = 1.0 * (distance_weight_f * (1-front_mio_v/v_max) + ... 
                                     distance_weight_r * rear_mio_v/v_max);
             
-            % 4) Front length cost 계산
+            % Front length cost 계산
             s_max = max(0, gap.s + gap.l/2); 
             s_min = max(0, gap.s - gap.l/2);
             front_length_cost = 2.0 * max(0, (1 - (s_max - s_min) / 150));
-
+            
             gap.node_cost = transport_cost + front_length_cost;
+            
+            % 4) Time-interval velocity range
+            v_low = max(v_min, terminal_velocity_range(:, 1) - a_max * (N_t-1 - i) * planning_resolution);
+            v_high = min(v_max, terminal_velocity_range(:, 2) - a_min * (N_t-1 - i) * planning_resolution);
+
+            gap.vel_range = [v_low, v_high];
+
+
             % f(t) 특정 time에서 모든 Lane에 대한 Gap 집합 생성
             f_t.G_t(j, k) = gap;
 
@@ -363,3 +462,4 @@ function [is_gap_front, is_gap_rear, ...
         end
     end
 end
+
