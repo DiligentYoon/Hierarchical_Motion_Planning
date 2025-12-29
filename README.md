@@ -34,5 +34,5 @@ The following GIFs show the results of running different scenarios. The ego vehi
 
 ### Scenario 2: Cluttered Scenario
 <p align="center">
-<img src="Ours/Results/scenario_2_result.gif" width="480"/>
+<img src="Ours/Results/scenario_3_result.gif" width="480"/>
 </p>  
