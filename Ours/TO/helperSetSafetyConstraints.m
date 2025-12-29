@@ -2,6 +2,7 @@ function [A_safe, b_safe] = helperSetSafetyConstraints(gap_sequence, build, plan
     m = plannerparams.degree;
     N = plannerparams.num_piece;
     dt = plannerparams.PlanningResolution;
+    MaxFront = plannerparams.MaxFront;
     ep = 1e-7;
     % 제어점 개수
     num_vars_total = N * (m + 1) * 2;
@@ -62,7 +63,6 @@ function [A_safe, b_safe] = helperSetSafetyConstraints(gap_sequence, build, plan
                 d_min_t1 = (current_gap.d - current_gap.w/2);
                 d_max_t2 = (next_gap.d + next_gap.w/2);
                 d_min_t2 = (next_gap.d - next_gap.w/2);
-
 
                 u = linspace(0, 1, m+1);
                 s_min = s_min_t1 .* ones(m+1, 1);

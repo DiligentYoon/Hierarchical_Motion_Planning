@@ -24,8 +24,8 @@ time = tout;
 ego_frenet = squeeze(EgoFrenet.signals.values);
 ego_info = squeeze(EgoInfo.signals.values);
 inverse_ttc = inverse_TTC.signals.values;
-trigger = Trigger.signals.values;
-trajectory = Trajectory.signals.values;
+safety_trigger = safety_signal.signals.values;
+decision_trigger = decision_signal.signals.values;
 safety_distance = Safety_Distance.signals.values;
 
 
@@ -49,6 +49,7 @@ yline(params.MaxLonVel, 'r--', 'MaxLonVel', 'LabelHorizontalAlignment', 'left');
 yline(params.MinLonVel, 'r--', 'MinLonVel', 'LabelHorizontalAlignment', 'left');
 xlabel('Time (s)'); 
 ylabel('Velocity (m/s)');
+ylim([10, params.MaxLonVel + 5]);
 title('Ego Vehicle Longitudinal Velocity');
 grid on;
 
@@ -141,33 +142,35 @@ fprintf("total lateral distance : %.2f\n", travel_lat_dist);
 
 
 %% Excel
-excelFile = 'Results/result_w_case3.xlsx';
-
-% Summary metrics 
-
-summaryTbl = table(mean_ittc, num_ittc, travel_lon_dist, travel_lat_dist, ...
-    'VariableNames', {'MeanITTC', 'NumITTC', 'TravelLonDist', 'TravelLatDist'});
-
-writetable(summaryTbl, excelFile, 'Sheet', 'Summary', 'WriteMode', 'overwritesheet');
-
-timeSeriesTbl = table( ...
-    time(:), ...
-    ego_frenet(2, :).', ...        % Longitudinal velocity
-    approx_lat_vel(:), ...         % Lateral velocity
-    approx_lon_accel(:), ...       % Longitudinal acceleration
-    approx_lat_accel(:), ...       % Lateral acceleration
-    inverse_ttc(:), ...            % Inverse TTC
-    safety_distance(:), ...        % Safety Distance
-    trigger(:), ...                % Trigger
-    'VariableNames', { ...
-        'Time', ...
-        'LonVel', ...
-        'LatVel', ...
-        'LonAccel', ...
-        'LatAccel', ...
-        'ITTC', ...
-        'SafetyDistance', ...
-        'Trigger'});
-
-% "TimeSeries" 시트에 저장
-writetable(timeSeriesTbl, excelFile, 'Sheet', 'TimeSeries', 'WriteMode', 'overwritesheet');
+% excelFile = 'Results/result_w_case1.xlsx';
+% 
+% % Summary metrics
+% 
+% summaryTbl = table(mean_ittc, num_ittc, travel_lon_dist, travel_lat_dist, ...
+%     'VariableNames', {'MeanITTC', 'NumITTC', 'TravelLonDist', 'TravelLatDist'});
+% 
+% writetable(summaryTbl, excelFile, 'Sheet', 'Summary', 'WriteMode', 'overwritesheet');
+% 
+% timeSeriesTbl = table( ...
+%     time(:), ...
+%     ego_frenet(2, :).', ...        % Longitudinal velocity
+%     approx_lat_vel(:), ...         % Lateral velocity
+%     approx_lon_accel(:), ...       % Longitudinal acceleration
+%     approx_lat_accel(:), ...       % Lateral acceleration
+%     inverse_ttc(:), ...            % Inverse TTC
+%     safety_distance(:), ...        % Safety Distance
+%     safety_trigger(:), ...         % Safety Trigger
+%     decision_trigger(:), ...       % Decision Trigger
+%     'VariableNames', { ...
+%         'Time', ...
+%         'LonVel', ...
+%         'LatVel', ...
+%         'LonAccel', ...
+%         'LatAccel', ...
+%         'ITTC', ...
+%         'SafetyDistance', ...
+%         'SafetyTrigger', ...
+%         'DecisionTrigger'});
+% 
+% % "TimeSeries" 시트에 저장
+% writetable(timeSeriesTbl, excelFile, 'Sheet', 'TimeSeries', 'WriteMode', 'overwritesheet');

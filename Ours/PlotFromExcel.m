@@ -10,6 +10,8 @@ params = struct("MaxLonVel", maxLonVelocity, ...
 
 excelFiles = ["Results/result_w_case1.xlsx", ...
               "Results/result_wo_case1.xlsx", ...
+              "Results/result_w_case2.xlsx", ...
+              "Results/result_wo_case2.xlsx", ...
               "Results/result_w_case3.xlsx", ...
               "Results/result_wo_case3.xlsx"];
 
@@ -18,8 +20,11 @@ excelFiles = ["Results/result_w_case1.xlsx", ...
 [s1_w, ts1_w] = load_sim_results(excelFiles(1));
 [s1_wo, ts1_wo] = load_sim_results(excelFiles(2)); 
 
-[s3_w, ts3_w] = load_sim_results(excelFiles(3));
-[s3_wo, ts3_wo] = load_sim_results(excelFiles(4)); 
+[s2_w, ts2_w] = load_sim_results(excelFiles(3));
+[s2_wo, ts2_wo] = load_sim_results(excelFiles(4));
+
+[s3_w, ts3_w] = load_sim_results(excelFiles(5));
+[s3_wo, ts3_wo] = load_sim_results(excelFiles(6)); 
 
 
 %% Plot
@@ -31,92 +36,112 @@ figure; set(gcf, 'color', 'w', 'Position', [100 100 1800 600]);
 timeTrigPeriod = 3.0;   % time-expiration trigger 주기
 timeTrigTol    = 0.15;  % "3초" 판별 허용 오차 
 
-% ========== (1,1) TTC with manager ==========
+% ========== (1,1) ITTC with manager ==========
 subplot(2,2,1);
-plot_ttc_with_triggers(ts1_w, params, timeTrigPeriod, timeTrigTol);
-title('Ablation 2 - TTC (with manager)');
+plot_ittc_with_triggers(ts1_w, params, timeTrigPeriod, timeTrigTol);
+title('Scenario 1 - ITTC (with manager)');
 
 % ========== (1,2) Safety Distance with manager ==========
 subplot(2,2,2);
 plot_safety_with_triggers(ts1_w, params, timeTrigPeriod, timeTrigTol);
-title('Ablation 2 - Safety distance (with manager)');
+title('Scenario 1 - Safety distance (with manager)');
 
-% ========== (2,1) TTC without manager ==========
+% ========== (2,1) ITTC without manager ==========
 subplot(2,2,3);
-plot_ttc_with_triggers(ts1_wo, params, timeTrigPeriod, timeTrigTol);
-title('Ablation 2 - TTC (without manager)');
+plot_ittc_with_triggers(ts1_wo, params, timeTrigPeriod, timeTrigTol);
+title('Scenario 1 - ITTC (without manager)');
 
 % ========== (2,2) Safety Distance without manager ==========
 subplot(2,2,4);
 plot_safety_with_triggers(ts1_wo, params, timeTrigPeriod, timeTrigTol);
-title('Ablation 2 - Safety distance (without manager)');
+title('Scenario 1 - Safety distance (without manager)');
+
+
+% Scenario 2: (2 x 2) subplot
+figure; set(gcf, 'color', 'w', 'Position', [100 100 1800 600]);
+
+% ========== (1,1) ITTC with manager ==========
+subplot(2,2,1);
+plot_ittc_with_triggers(ts2_w, params, timeTrigPeriod, timeTrigTol);
+title('Scenario 2 - ITTC (with manager)');
+
+% ========== (1,2) Safety Distance with manager ==========
+subplot(2,2,2);
+plot_safety_with_triggers(ts2_w, params, timeTrigPeriod, timeTrigTol);
+title('Scenario 2 - Safety distance (with manager)');
+
+% ========== (2,1) ITTC without manager ==========
+subplot(2,2,3);
+plot_ittc_with_triggers(ts2_wo, params, timeTrigPeriod, timeTrigTol);
+title('Scenario 2 - ITTC (without manager)');
+
+% ========== (2,2) Safety Distance without manager ==========
+subplot(2,2,4);
+plot_safety_with_triggers(ts2_wo, params, timeTrigPeriod, timeTrigTol);
+title('Scenario 2 - Safety distance (without manager)');
 
 
 % Scenario 3: (2 x 2) subplot
 figure; set(gcf, 'color', 'w', 'Position', [100 100 1800 600]);
 
-% ========== (1,1) TTC with manager ==========
+% ========== (1,1) ITTC with manager ==========
 subplot(2,2,1);
-plot_ttc_with_triggers(ts3_w, params, timeTrigPeriod, timeTrigTol);
-title('Ablation 1 - TTC (with manager)');
+plot_ittc_with_triggers(ts3_w, params, timeTrigPeriod, timeTrigTol);
+title('Scenario 3 - ITTC (with manager)');
 
 % ========== (1,2) Safety Distance with manager ==========
 subplot(2,2,2);
 plot_safety_with_triggers(ts3_w, params, timeTrigPeriod, timeTrigTol);
-title('Ablation 1 - Safety distance (with manager)');
+title('Scenario 3 - Safety distance (with manager)');
 
-% ========== (2,1) TTC without manager ==========
+% ========== (2,1) ITTC without manager ==========
 subplot(2,2,3);
-plot_ttc_with_triggers(ts3_wo, params, timeTrigPeriod, timeTrigTol);
-title('Ablation 1 - TTC (without manager)');
+plot_ittc_with_triggers(ts3_wo, params, timeTrigPeriod, timeTrigTol);
+title('Scenario 3 - ITTC (without manager)');
 
 % ========== (2,2) Safety Distance without manager ==========
 subplot(2,2,4);
 plot_safety_with_triggers(ts3_wo, params, timeTrigPeriod, timeTrigTol);
-title('Ablation 1 - Safety distance (without manager)');
-
+title('Scenario 3 - Safety distance (without manager)');
 
 
 %% ------------------------------------------------------------------------
 
-function plot_ttc_with_triggers(ts, params, timeTrigPeriod, timeTrigTol)
+function plot_ittc_with_triggers(ts, params, timeTrigPeriod, timeTrigTol)
     time = ts.time;
-    ttc  = ts.ttc;
+    ittc  = ts.inverse_ttc;
 
     % 상한 클리핑
-    ttc_plot = min(ttc, params.MaxTTC);
+    ttc_plot = min(ittc, params.MaxTTC);
 
     % 포화 구간 마스크 (TTC == MaxTTC 근처)
-    sat_mask = (ttc >= params.MaxTTC - 1e-6);
+    sat_mask = (ittc >= params.MaxTTC - 1e-6);
 
-    % 1) 전체 구간을 점선으로 먼저 그림
+    % 전체 구간을 점선으로 먼저 그림
     plot(time, ttc_plot, 'b--', 'LineWidth', 0.5); hold on;
 
-    % 2) 포화가 아닌 구간만 진한 빨간색으로 덧그리기
-    ttc_active = ttc_plot;
-    ttc_active(sat_mask) = NaN;   % active 구간만 남김
-    plot(time, ttc_active, 'r', 'LineWidth', 1.5);
+    % % 2) 포화가 아닌 구간만 진한 빨간색으로 덧그리기
+    % ttc_active = ttc_plot;
+    % ttc_active(sat_mask) = NaN;
+    % plot(time, ttc_active, 'r', 'LineWidth', 1.5);
+    % 
+    % 
 
-    % 기준선들
-    yline(params.MinTTC, 'm--', 'MinTTC', 'LabelHorizontalAlignment', 'left');
-    yline(params.MaxTTC, 'g--', 'MaxTTC', 'LabelHorizontalAlignment', 'left');
-    yline(0, 'r--', 'Safety Margin Violation', 'LabelHorizontalAlignment','left');
-
-    % Trigger 마킹 (safety trigger만)
+    % Trigger 마킹
     trig_times = get_safety_trigger_times(time, ts.trigger, timeTrigPeriod, timeTrigTol);
     if ~isempty(trig_times)
         ttc_at_trig = interp1(time, ttc_plot, trig_times, 'linear', 'extrap');
         scatter(trig_times, ttc_at_trig, 50, 'r', 'filled', 'v');
     end
 
+    % 기준선들
+    yline(1/params.MinTTC, 'm--', 'Max ITTC', 'LabelHorizontalAlignment', 'left');
+    
     xlabel('Time (s)');
-    ylabel('TTC (s)');
+    ylabel('ITTC (s)');
     grid on;
     xlim([time(1), time(end)]);
-    ylim([-1, params.MaxTTC + 1]);
-
-    % 필요하면 legend도 추가 가능
-    % legend({'TTC (saturated)','TTC (active region)','Trigger'}, 'Location','best');
+    ylim([0, 1/params.MinTTC + 1]);
 end
 
 
@@ -125,15 +150,13 @@ function plot_safety_with_triggers(ts, params, timeTrigPeriod, timeTrigTol)
     sd   = ts.safety_distance;
 
     % 포화 기준: 150 (또는 params.MaxFront 사용)
-    sat_mask = (sd >= 150 - 1e-6);
+    % sat_mask = (sd >= 150 - 1e-6);
 
-    % 1) 전체 구간을 점선으로 그림
     plot(time, sd, 'b--', 'LineWidth', 0.5); hold on;
 
-    % 2) 포화가 아닌 구간만 진한 빨간색으로 덧그리기
-    sd_active = sd;
-    sd_active(sat_mask) = NaN;
-    plot(time, sd_active, 'r', 'LineWidth', 1.5);
+    % sd_active = sd;
+    % sd_active(sat_mask) = NaN;
+    % plot(time, sd_active, 'r', 'LineWidth', 1.5);
     
     yline(150, 'g--', 'Max Front Margin', 'LabelHorizontalAlignment', 'left')
     yline(params.MaxFront, 'r--', 'Safety Margin Violation', 'LabelHorizontalAlignment', 'left');
@@ -201,8 +224,8 @@ end
 function [summary, ts] = load_sim_results(excelFile)
     % Summary 시트
     summaryTbl = readtable(excelFile, 'Sheet', 'Summary');
-    summary.mean_ttc        = summaryTbl.MeanTTC(1);
-    summary.num_ttc         = summaryTbl.NumTTC(1);
+    summary.mean_ttc        = summaryTbl.MeanITTC(1);
+    summary.num_ttc         = summaryTbl.NumITTC(1);
     summary.travel_lon_dist = summaryTbl.TravelLonDist(1);
     summary.travel_lat_dist = summaryTbl.TravelLatDist(1);
 
@@ -213,7 +236,7 @@ function [summary, ts] = load_sim_results(excelFile)
     ts.lat_vel          = tsTbl.LatVel;
     ts.lon_accel        = tsTbl.LonAccel;
     ts.lat_accel        = tsTbl.LatAccel;
-    ts.ttc              = tsTbl.TTC;
+    ts.inverse_ttc      = tsTbl.ITTC;
     ts.safety_distance  = tsTbl.SafetyDistance;
     ts.trigger          = tsTbl.Trigger;
 end
