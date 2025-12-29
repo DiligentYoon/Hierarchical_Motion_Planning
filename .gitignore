@@ -28,7 +28,6 @@ codegen/
 resources/
 
 # Results File
-Results/
 !Results/scenario_1_result.gif
 !Results/scenario_2_result.gif
 !Results/scenario_3_result.gif
