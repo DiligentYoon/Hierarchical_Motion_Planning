@@ -108,7 +108,7 @@
         EnableBirdsEyeView (1, 1) logical = true;
 
         % gif
-        useGIF (1, 1) logical = false;
+        useGIF (1, 1) logical = true;
 
     end
 

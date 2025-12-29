@@ -19,7 +19,7 @@ arguments
          "scenario_02_DecisionTrigger"; ...
          "scenario_03_ClutteredEnv"; ...
          "scenario_04_ClutteredEnv_2" ...
-         ])} = "scenario_04_ClutteredEnv_2";
+         ])} = "scenario_01_MergingCar";
 end
 
 % Load the test bench model
@@ -124,7 +124,7 @@ MaxFront = 20;
 MaxRear = 20;
 
 Useresample = true;
-feasible_coeff = 0.8;
+feasible_coeff = 0.7;
 
 assignin('base', 'timeHorizon' , timeHorizon);
 assignin('base','timeResolution',timeResolution);
