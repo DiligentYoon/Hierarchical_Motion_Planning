@@ -88,7 +88,8 @@ time_interval = 0 : planning_resolution : planning_horizon;
 % 1. Boundary B(t) 생성
 % 2. Gaps G(t) 생성
 % 3. Freeset F(t) 생성
-%% Occupied Region 정의 
+%% Occupied Region 정의
+ego_offset = EgoState(4) - LaneCenters(egolane);
 occupied_regions = zeros(N_t, N_l, N_k, 2);
 num_regions = zeros(N_t, N_l);
 veh_length = EgoActor.Length;
@@ -109,7 +110,7 @@ for i = 1:numel(time_interval)-1
             MIO_init_glo_state = mioGlobalFrenetStates.MIOStates(k, :);
 
             s_r = MIO_init_rel_state(1);
-            l_r = MIO_init_rel_state(4);
+            l_r = MIO_init_rel_state(4) + ego_offset;
             vs_g = MIO_init_glo_state(2);
             vl_g = MIO_init_glo_state(5);
 
